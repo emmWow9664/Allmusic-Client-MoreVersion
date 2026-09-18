@@ -1,0 +1,35 @@
+plugins {
+    // 26.x 世代：长插件 id + 最新 loom，官方命名环境无需映射
+    id("net.fabricmc.fabric-loom") version "1.17-SNAPSHOT"
+}
+
+java.sourceCompatibility = JavaVersion.VERSION_25
+java.targetCompatibility = JavaVersion.VERSION_25
+
+dependencies {
+    minecraft("com.mojang:minecraft:26.1.2")
+    implementation("net.fabricmc:fabric-loader:0.19.3")
+
+    implementation("net.fabricmc.fabric-api:fabric-api:0.152.1+26.1.2")
+
+    compileOnly("de.maxhenkel.voicechat:voicechat-api:2.6.0")
+}
+
+tasks {
+    processResources {
+        filesMatching("fabric.mod.json") {
+            expand(
+                "version" to project.version
+            )
+        }
+    }
+
+    shadowJar {
+        archiveFileName.set("[fabric-26.1.2]AllMusic_Client-${project.version}.jar")
+        destinationDirectory.set(file("${parent!!.projectDir}/../build"))
+    }
+
+    build {
+        dependsOn(shadowJar)
+    }
+}

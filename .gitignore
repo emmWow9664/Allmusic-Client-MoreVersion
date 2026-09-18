@@ -1,0 +1,10 @@
+.gradle/
+build/tmp/
+client/*/build/
+codec/build/
+buildSrc/build/
+**/cookie.json
+**/latest.log
+.idea/
+*.iml
+
