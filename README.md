@@ -1,4 +1,4 @@
-*本项目由AI生成，并同步到仓库
+*本项目由AI生成
 # Allmusic-Client-MoreVersion
 
 AllMusic Client（Fabric 客户端模组）多版本适配工程：将官方 [AllMusic](https://github.com/Coloryr/AllMusic) 客户端模组适配到多个 Minecraft 版本，统一构建、统一产物格式。
