@@ -6,6 +6,7 @@ include(":client:fabric_1_21_1")
 include(":client:fabric_1_21_2")
 include(":client:fabric_1_21_5")
 include(":client:fabric_1_21_7")
+include(":client:fabric_1_21_8")
 include(":client:fabric_1_21_10")
 include(":client:fabric_26_1_2")
 

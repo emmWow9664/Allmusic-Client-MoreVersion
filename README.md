@@ -11,6 +11,7 @@ AllMusic Client（Fabric 客户端模组）多版本适配工程：将官方 [Al
 | 1.21.2 | `client:fabric_1_21_2` | legacy |
 | 1.21.5 | `client:fabric_1_21_5` | legacy |
 | 1.21.7 | `client:fabric_1_21_7` | compat_1_21_6 |
+| 1.21.8 | `client:fabric_1_21_8` | compat_1_21_6 |
 | 1.21.10 | `client:fabric_1_21_10` | compat_1_21_11 |
 | 26.1.2 | `client:fabric_26_1_2` | modern |
 
