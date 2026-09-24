@@ -8,3 +8,6 @@ buildSrc/build/
 .idea/
 *.iml
 
+# IDE 编译输出
+**/bin/
+
