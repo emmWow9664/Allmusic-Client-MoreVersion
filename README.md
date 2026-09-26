@@ -51,8 +51,9 @@ build/[fabric-<MC版本>]AllMusic_Client-4.2.2.jar
 
 `legacy-3x/` 是 AllMusic 客户端 **3.x（3.7.4，tag `3.7.4`）老协议** 产线的独立副本，与上面的 4.x 产线（`client/`）**并存、源码互不混合**。两者构建体系彼此独立：4.x 使用本仓库根的多项目 Gradle；3.x 沿用其自带的「每个模块一个独立 Gradle 工程 + 目录联接（junction）共享核心代码」方式，因此不作为根工程的子项目被 `include`。
 
-- 覆盖 Minecraft 版本（Fabric，共 15 个）：
-  `1.21 / 1.21.1 / 1.21.2 / 1.21.3 / 1.21.4 / 1.21.5 / 1.21.6 / 1.21.7 / 1.21.8 / 1.21.9 / 1.21.10 / 1.21.11 / 26.1 / 26.1.2 / 26.2`
+- 覆盖 Minecraft 版本（Fabric，共 11 个，均为官方 3.7.4 未提供的版本）：
+  `1.21.1 / 1.21.2 / 1.21.3 / 1.21.4 / 1.21.5 / 1.21.7 / 1.21.8 / 1.21.9 / 1.21.10 / 26.1.2 / 26.2`
+- 官方 3.7.4 已支持的版本（`1.16.5 / 1.20.1 / 1.21 / 1.21.6 / 1.21.11 / 26.1`）**不在本产线内**，这些版本请直接使用上游 [AllMusic_Client](https://github.com/Coloryr/AllMusic_Client) 的产物
 - 模块目录：`legacy-3x/fabric_<版本>/`
 - 共享核心代码：`legacy-3x/core`、`legacy-3x/codec`、`legacy-3x/buffercodec`、`legacy-3x/mp3`，由 `legacy-3x/link.cmd` 以 junction 链接进各模块的源码/资源目录（这些链接目录已被 `.gitignore` 忽略）
 - 与 4.x 产线的区别：3.x 使用老协议（`com.coloryr.allmusic.client.core` 的 `Object` 材质桥、`MiniMessage` 等），4.x 是重写后的新协议；两者互不引用来回。
@@ -63,10 +64,10 @@ build/[fabric-<MC版本>]AllMusic_Client-4.2.2.jar
 2. 逐模块构建（每个模块是独立 Gradle 工程，自带 wrapper）：
    - 1.21.x 世代：**JDK 21**，Loom `1.17.20`，`fabric-loom`（官方映射 + remap）
    - 26.x 世代：**JDK 25**，Loom `1.17-SNAPSHOT`，`net.fabricmc.fabric-loom`（官方命名环境，无需映射）
-   - 例：`cd legacy-3x/fabric_1_21_11 ; ./gradlew build`
+   - 例：`cd legacy-3x/fabric_26_2 ; ./gradlew build`
    - 或使用 `legacy-3x/build.cmd`（交互式菜单）
 3. 产物统一输出到 `legacy-3x/build/libs/`（各模块的 `build/libs` 是指向该目录的 junction），命名 `[fabric-<MC版本>]AllMusic_Client-<版本>.jar`
-4. 汇总产物在 `legacy-3x/releases/`（15 个 jar）
+4. 本地汇总产物在 `legacy-3x/releases/`（构建输出，不入库）；对外分发使用本仓库 Release 中本产线补充的 11 个版本
 
 ### 世代与适配要点
 
@@ -79,3 +80,5 @@ build/[fabric-<MC版本>]AllMusic_Client-4.2.2.jar
 | C | 1.21.9、1.21.10 | 仍名为 `ResourceLocation`（`Identifier` 自 1.21.11 起） |
 | C' | 1.21.11 | `Identifier` 命名 |
 | D | 26.1、26.1.2、26.2 | 官方命名环境（无映射）、Java 25、`GuiGraphicsExtractor`；`GuiShow` 注入 `extractRenderState`，26.2 的 HUD 类为 `Hud`；26.2 纹理格式改用 `com.mojang.blaze3d.GpuFormat.RGBA8_UNORM` |
+
+> 注：上表中 `1.21`、`1.21.6`、`1.21.11`、`26.1` 对应的官方模块已按「只保留官方 3.7.4 未提供的版本」从本仓库移除，相关条目仅作世代差异的对照参考。
