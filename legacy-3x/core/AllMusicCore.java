@@ -1,0 +1,320 @@
+package com.coloryr.allmusic.client.core;
+
+import com.coloryr.allmusic.client.core.hud.AllMusicHud;
+import com.coloryr.allmusic.client.core.objs.ConfigObj;
+import com.coloryr.allmusic.client.core.player.AllMusicPlayer;
+import com.coloryr.allmusic.codec.CommandType;
+import com.coloryr.allmusic.codec.HudPosObj;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import io.netty.buffer.ByteBuf;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.LoggerConfig;
+import org.lwjgl.opengl.GL11;
+
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * AllMusic核心
+ */
+public class AllMusicCore {
+    public static final CommandType[] types = CommandType.values();
+
+    private static final Gson gson = new Gson();
+    /**
+     * 与游戏链接的桥
+     */
+    public static AllMusicBridge bridge;
+    /**
+     * 配置文件
+     */
+    public static ConfigObj config;
+    public static CloseableHttpClient client;
+    /**
+     * 音频解码器与播放器
+     */
+    private static AllMusicPlayer player;
+    /**
+     * 界面显示内容
+     */
+    private static AllMusicHud hud;
+
+    /**
+     * 更新音频缓存
+     */
+    public static void tick() {
+        if (player != null) {
+            player.tick();
+        }
+    }
+
+    /**
+     * 是否正在播放音乐
+     *
+     * @return 是否在播放
+     */
+    public static boolean isPlay() {
+        if (player == null) {
+            return false;
+        }
+        return player.isPlay();
+    }
+
+    public static void init(Path file, AllMusicBridge bridge, IntBuffer source) {
+        List<Header> headers = new ArrayList<>();
+        headers.add(new BasicHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0"));
+        client = HttpClients.custom().setDefaultHeaders(headers).build();
+
+        File configFile = new File(file.toFile(), "allmusic_client.json");
+        if (configFile.exists()) {
+            try {
+                InputStreamReader reader = new InputStreamReader(
+                        Files.newInputStream(configFile.toPath()),
+                        StandardCharsets.UTF_8);
+                BufferedReader bf = new BufferedReader(reader);
+                config = new Gson().fromJson(bf, ConfigObj.class);
+                bf.close();
+                reader.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        if (config == null) {
+            config = new ConfigObj();
+            config.picSize = 200;
+            config.queueSize = 100;
+            config.exitSize = 50;
+            try {
+                String data = new GsonBuilder().setPrettyPrinting()
+                        .create()
+                        .toJson(config);
+                FileOutputStream out = new FileOutputStream(configFile);
+                OutputStreamWriter write = new OutputStreamWriter(out, StandardCharsets.UTF_8);
+                write.write(data);
+                write.close();
+                out.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        // 旧版本客户端写的（或手工编辑的）配置文件往往缺少字段，Gson 会把缺的 int 解析成 0：
+        // exitSize=0 会让播放器的 tick 一进循环就 break，音频永远不会进入 OpenAL，
+        // 表现为「封面/歌词/歌曲信息都正常，就是没有声音」；这里把非法值兜回默认。
+        if (config.picSize <= 0) {
+            config.picSize = 200;
+        }
+        if (config.queueSize <= 0) {
+            config.queueSize = 100;
+        }
+        if (config.exitSize <= 0) {
+            config.exitSize = 50;
+        }
+
+        AllMusicCore.bridge = bridge;
+        player = new AllMusicPlayer(source);
+
+        LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
+        Configuration config = ctx.getConfiguration();
+
+        LoggerConfig loggerConfig = config.getLoggerConfig("org.apache.hc.client5");
+        loggerConfig.setLevel(Level.INFO);
+
+        LoggerConfig coreConfig = config.getLoggerConfig("org.apache.hc.core5");
+        coreConfig.setLevel(Level.INFO);
+
+        ctx.updateLoggers(config);
+    }
+
+    /**
+     * 初始化核心
+     *
+     * @param file   配置文件
+     * @param bridge 游戏桥
+     */
+    public static void init(Path file, AllMusicBridge bridge) {
+        init(file, bridge, null);
+    }
+
+    /**
+     * 贴图初始化
+     */
+    public static void glInit() {
+        hud = new AllMusicHud(config.picSize);
+    }
+
+    /**
+     * 退出服务器时
+     */
+    public static void onServerQuit() {
+        try {
+            stopPlaying();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        hud.save = null;
+    }
+
+    /**
+     * 停止播放
+     */
+    private static void stopPlaying() {
+        player.closePlayer();
+        hud.close();
+    }
+
+    /**
+     * 重载音频
+     */
+    public static void reload() {
+        if (player != null) {
+            player.setReload();
+        }
+    }
+
+    /**
+     * 更新显示内容
+     */
+    public static void hudUpdate() {
+        hud.update();
+    }
+
+    /**
+     * 从数据包中读文字
+     *
+     * @param buf 数据包
+     * @return 文字
+     */
+    private static String readString(ByteBuf buf) {
+        int size = buf.readInt();
+        byte[] temp = new byte[size];
+        buf.readBytes(temp);
+
+        return new String(temp, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 读取数据包
+     *
+     * @param buffer 数据包
+     */
+    public static void packRead(ByteBuf buffer) {
+        byte type = buffer.readByte();
+        if (type >= types.length || type < 0) {
+            return;
+        }
+        CommandType type1 = types[type];
+        String data = null;
+        int data1 = 0;
+        switch (type1) {
+            case LYRIC:
+            case INFO:
+            case LIST:
+            case PLAY:
+            case IMG:
+            case HUD_DATA:
+                data = readString(buffer);
+                break;
+            case POS:
+                data1 = buffer.readInt();
+                break;
+        }
+        packDo(type1, data, data1);
+        buffer.clear();
+    }
+
+    /**
+     * 解析数据包
+     *
+     * @param type  命令
+     * @param data  数据
+     * @param data1 数据
+     */
+    public static void packDo(CommandType type, String data, int data1) {
+        if (type == CommandType.PLAY) {
+            bridge.stopPlayMusic();
+        }
+
+        switch (type) {
+            case LYRIC:
+                hud.lyric = data;
+                break;
+            case INFO:
+                hud.info = data;
+                break;
+            case LIST:
+                hud.list = data;
+                break;
+            case PLAY:
+                stopPlaying();
+                player.setMusic(data);
+                break;
+            case IMG:
+                hud.setImg(data);
+                break;
+            case STOP:
+                stopPlaying();
+                break;
+            case CLEAR:
+                hud.close();
+                break;
+            case POS:
+                player.setTime(data1);
+                break;
+            case HUD_DATA:
+                hud.setPos(gson.fromJson(data, HudPosObj.class));
+                break;
+        }
+    }
+
+    /**
+     * 创建GL材质
+     *
+     * @param size 大小
+     * @return 材质号
+     */
+    public static int genGLTexture(int size) {
+        int textureID = GL11.glGenTextures();
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureID);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+//        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+//        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+//        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL20.GL_TEXTURE_MAX_LEVEL, 0);
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, size,
+                size, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        return textureID;
+    }
+
+    /**
+     * 更新GL材质
+     *
+     * @param id         材质id
+     * @param size       大小
+     * @param byteBuffer 数据
+     */
+    public static void updateGLTexture(int id, int size, ByteBuffer byteBuffer) {
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, id);
+        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0);
+        GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, size,
+                size, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, byteBuffer);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+    }
+}

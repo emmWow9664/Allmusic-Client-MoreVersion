@@ -1,0 +1,40 @@
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+.idea
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+
+# 上游遗留的运行产物 / 日志
+**/runs/
+**/logs/
+*.log.gz
+
+# Files from Forge MDK
+forge*changelog.txt
+
+workspace.xml
+
+**/allmusic/buffercodec/
+**/allmusic/codec/
+**/allmusic/client/core/
+**/allmusic/client/core/player/decoder/mp3/
+
+# 3.x 产线汇总产物（15 个 jar）：仅通过 GitHub Releases 分发，不入库
+releases/

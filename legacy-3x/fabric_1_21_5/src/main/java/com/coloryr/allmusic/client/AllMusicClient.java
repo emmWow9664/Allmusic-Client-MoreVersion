@@ -1,0 +1,141 @@
+package com.coloryr.allmusic.client;
+
+import com.coloryr.allmusic.client.core.AllMusicBridge;
+import com.coloryr.allmusic.client.core.AllMusicCore;
+import com.coloryr.allmusic.client.mixin.GuiRender;
+import com.coloryr.allmusic.comm.MusicCodec;
+import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.GpuTexture;
+
+import com.mojang.blaze3d.textures.TextureFormat;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundSource;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.joml.Matrix4f;
+import org.joml.Quaternionf;
+
+import java.nio.ByteBuffer;
+
+public class AllMusicClient implements ClientModInitializer, AllMusicBridge {
+    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath("allmusic", "channel");
+    public static final Logger LOGGER = LogManager.getLogger("AllMusic Client");
+    private static GuiGraphics context;
+
+    public static void update(GuiGraphics draw) {
+        context = draw;
+        AllMusicCore.hudUpdate();
+    }
+
+    public Object genTexture(int size) {
+        var tex = RenderSystem.getDevice().createTexture("allmusic:gui_textured", TextureFormat.RGBA8, size, size, 1);
+
+        Minecraft.getInstance().getTextureManager().register(ID, new Tex(tex));
+
+        return tex;
+    }
+
+    public void updateTexture(Object tex, int size, ByteBuffer byteBuffer) {
+        if (tex instanceof GlTexture tex1) {
+            AllMusicCore.updateGLTexture(tex1.glId(), size, byteBuffer);
+        }
+    }
+
+    public int getScreenWidth() {
+        return Minecraft.getInstance().getWindow().getGuiScaledWidth();
+    }
+
+    public int getScreenHeight() {
+        return Minecraft.getInstance().getWindow().getGuiScaledHeight();
+    }
+
+    public int getTextWidth(String item) {
+        return Minecraft.getInstance().font.width(item);
+    }
+
+    public int getFontHeight() {
+        return Minecraft.getInstance().font.lineHeight;
+    }
+
+    public void drawText(String item, int x, int y, int color, boolean shadow) {
+        var hud = Minecraft.getInstance().font;
+        Component component = MiniMessage.parse(item);
+        context.drawString(hud, component, x, y, color, shadow);
+    }
+
+    public void drawPic(Object texture, int size, int x, int y, int ang) {
+        GuiRender render = (GuiRender) context;
+        VertexConsumer buffer = render.getBufferSource().getBuffer(RenderType.guiTexturedOverlay(ID));
+
+        int a = size / 2;
+
+        Matrix4f matrix;
+        if (ang > 0) {
+            matrix = new Matrix4f().translationRotate(x + a, y + a, 0,
+                    new Quaternionf().fromAxisAngleDeg(0, 0, 1, ang));
+        } else {
+            matrix = new Matrix4f().translation(x + a, y + a, 0);
+        }
+
+        int x0 = -a;
+        int x1 = a;
+        int y0 = -a;
+        int y1 = a;
+        int z = 0;
+        float u0 = 0;
+        float u1 = 1;
+        float v0 = 0;
+        float v1 = 1;
+
+        buffer.addVertex(matrix, (float) x0, (float) y1, (float) z).setUv(u0, v1).setColor(1.0F, 1.0F, 1.0F, 1.0F);
+        buffer.addVertex(matrix, (float) x1, (float) y1, (float) z).setUv(u1, v1).setColor(1.0F, 1.0F, 1.0F, 1.0F);
+        buffer.addVertex(matrix, (float) x1, (float) y0, (float) z).setUv(u1, v0).setColor(1.0F, 1.0F, 1.0F, 1.0F);
+        buffer.addVertex(matrix, (float) x0, (float) y0, (float) z).setUv(u0, v0).setColor(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
+    public void sendMessage(String data) {
+        data = "[AllMusic Client]" + data;
+        LOGGER.warn(data);
+        String finalData = data;
+        Minecraft.getInstance().execute(() -> {
+            if (Minecraft.getInstance().player == null)
+                return;
+            Minecraft.getInstance().player.displayClientMessage(Component.literal(finalData), false);
+        });
+    }
+
+    public float getVolume() {
+        return Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.RECORDS);
+    }
+
+    @Override
+    public void stopPlayMusic() {
+        Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC);
+        Minecraft.getInstance().getSoundManager().stop(null, SoundSource.RECORDS);
+    }
+
+    @Override
+    public void onInitializeClient() {
+        ClientPlayNetworking.registerGlobalReceiver(MusicCodec.ID, (pack, handler) -> {
+            AllMusicCore.packDo(pack.pack().type, pack.pack().data, pack.pack().data1);
+        });
+
+        AllMusicCore.init(FabricLoader.getInstance().getConfigDir(), this);
+    }
+
+    public static class Tex extends AbstractTexture {
+        public Tex(GpuTexture tex) {
+            this.texture = tex;
+        }
+    }
+}
